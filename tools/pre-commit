@@ -1,0 +1,58 @@
+#!/bin/bash -x
+IFS_BACKUP=$IFS
+IFS=$'\n'
+file_length=0
+error=0
+
+if git rev-parse --verify HEAD >/dev/null 2>&1
+then
+  against=HEAD
+else
+  # Initial commit: diff against an empty tree object
+  against=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+fi
+
+exec 1>&2
+
+file_name=`git diff-index --cached --name-only $against`
+maxline=`wc -l ${file_name}`
+maxline=${maxline% *}
+
+cat ${file_name} | while read line
+do
+
+    length=${#line}
+    for (( i = 0; i < length; i++ )); do
+
+        char=${line:i:1}
+        char_tab=${char%	}
+        if [[ $char != $char_tab ]]; then
+            tab_line=`expr $file_length + 1`
+            echo "File "$file_name",tab found in line ${tab_line}"
+            errors=1
+        fi
+
+    done
+
+    (( file_length++ ))
+
+    line_space=${line% }
+    if [[ $line != $line_space ]]; then
+        echo "File "$file_name",space found at the end of line ${file_length}"
+        errors=1
+    fi
+
+    if [[ $file_length = $maxline ]] && [[ $length = 0 ]]; then
+        echo "File "$file_name", blank line found at the end of this file"
+        errors=1
+    fi
+
+    if  [[ $file_length = $maxline ]] && [[ $errors = 1  ]]; then
+        exit 1
+    fi
+
+done
+
+error=$?
+
+exit $error
